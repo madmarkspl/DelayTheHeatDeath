@@ -1,4 +1,6 @@
-﻿using Silk.NET.Maths;
+﻿using System.Diagnostics;
+using Silk.NET.Input;
+using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 
@@ -11,7 +13,9 @@ internal class TheGame
 
     private readonly Random _rng;
     private IWindow _window;
+    private IKeyboard _primaryKeyboard;
     private GL _gl;
+    private Stopwatch _stopwatch = new Stopwatch();
 
     private float[] _points;
     private ShaderProgram? _shaderProgram;
@@ -21,14 +25,22 @@ internal class TheGame
     private Matrix4X4<float> _modelMatrix = Matrix4X4<float>.Identity;
     private Matrix4X4<float> _projectionMatrix = Matrix4X4<float>.Identity;
 
+    // TODO: 
+    private Transform _viewTransform = new Transform();
+    private Vector3D<float> _direction = new Vector3D<float>(0, -1, 0);
+    private float _rotation = 0;
+
+    private Player _player;
+    private List<Star> _stars = new List<Star>();
+
     public TheGame()
     {
         var options = WindowOptions.Default;
         options.Size = new Vector2D<int>(_width, _height);
         options.Title = "Delay The Heat Death - Ludum Dare 50 Compo entry";
         options.VSync = false;
-        options.UpdatesPerSecond = 60;
-        options.FramesPerSecond = 60;
+        //options.UpdatesPerSecond = 60;
+        //options.FramesPerSecond = 60;
 
         _window = Window.Create(options);
 
@@ -46,6 +58,16 @@ internal class TheGame
 
     private void OnLoad()
     {
+        var input = _window.CreateInput();
+
+        _primaryKeyboard = input.Keyboards.FirstOrDefault();
+
+        for (int i = 0; i < input.Keyboards.Count; i++)
+        {
+            input.Keyboards[i].KeyDown += KeyDown;
+            input.Keyboards[i].KeyUp += KeyUp;
+        }
+
         _gl = GL.GetApi(_window);
 
         _projectionMatrix = Matrix4X4.CreateOrthographic(_width, _height, 0.01f, 100.0f);
@@ -54,9 +76,17 @@ internal class TheGame
 
         _shaderProgram = ShaderProgram.Simple;
 
-        _points = GeneratePoints(500, 10000).ToArray();
+        //_points = GeneratePoints(2000, 10000);
 
-        _vbo = new BufferObject<float>(_gl, _points, BufferTargetARB.ArrayBuffer);
+        foreach (var point in GeneratePoints(2000, 1000))
+        {
+            _stars.Add(new(_gl, _rng, point.X, point.Y));
+        }
+
+        // TODO: drawing 10000 points from one array once or drawing 10000 times each point alone
+        // this needs wrapping in some Universe class; then maybe single buffer could be cleanly used for positions
+        var zeroZero = new[] { 0.0f, 0.0f };
+        _vbo = new BufferObject<float>(_gl, zeroZero, BufferTargetARB.ArrayBuffer);
         _vao = new VertexArrayObject<float, uint>(_gl, _vbo, default);
 
         _vao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, 2, 0);
@@ -66,33 +96,75 @@ internal class TheGame
         //_gl.CullFace(CullFaceMode.Back);
 
         _shaderProgram.Use();
+
+        _player = new Player(_gl);
+
+        _stopwatch.Start();
     }
 
-    private void OnUpdate(double obj)
+    private void OnUpdate(double delta)
     {
+        foreach (var star in _stars)
+        {
+            star.Update(delta);
+
+            _player.Interact(star);
+        }
+
+        _player.Update(delta);
+
+        _viewTransform.Position = -_player._transform.Position;
+
+        if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
+        {
+            Console.WriteLine($"{(int)(1 / delta)}");
+            _stopwatch.Restart();
+        }
     }
 
-    private unsafe void OnRender(double obj)
+    private unsafe void OnRender(double delta)
     {
         _gl.Clear((uint)(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit));
         
         _vao.Bind();
 
-        var colorLocation = _gl.GetUniformLocation(_shaderProgram, "uColor");
+        var viewLocation = _gl.GetUniformLocation(_shaderProgram, "uView");
+        var viewMatrix = _viewTransform.Matrix;
+        _gl.UniformMatrix4(viewLocation, 1, false, (float*)&viewMatrix);
 
-        _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 1.0f, 1.0f).ToSystem());
-
-        var modelLocation = _gl.GetUniformLocation(_shaderProgram, "uModel");
-
-        fixed (Matrix4X4<float>* mat = &_modelMatrix)
+        foreach (var star in _stars)
         {
-            _gl.UniformMatrix4(modelLocation, 1, false, (float*)mat);
+            star.Render(delta);
         }
 
-        _gl.DrawArrays(PrimitiveType.Points, 0, 10000);
+        //var modelLocation = _gl.GetUniformLocation(_shaderProgram, "uModel");
+        //fixed (Matrix4X4<float>* mat = &_modelMatrix)
+        //{
+        //    _gl.UniformMatrix4(modelLocation, 1, false, (float*)mat);
+        //}
+
+        //_gl.DrawArrays(PrimitiveType.Points, 0, 10000);
+
+        _player.Render(delta);
     }
 
-    private IEnumerable<float> GeneratePoints(float radius, int count)
+    private void KeyDown(IKeyboard arg1, Key key, int arg3)
+    {
+        if (key == Key.Escape)
+        {
+            _window.Close();
+            return;
+        }
+
+        _player.InterpretInput(key, KeyState.Pressed);
+    }
+
+    private void KeyUp(IKeyboard arg1, Key key, int arg3)
+    {
+        _player.InterpretInput(key, KeyState.Released);
+    }
+
+    private IEnumerable<Vector2D<float>> GeneratePoints(float radius, int count)
     {
         for (int i = 0; i < count; i++)
         {
@@ -101,8 +173,7 @@ internal class TheGame
             var x = (float)(Math.Cos(theta) * r);
             var y = (float)(Math.Sin(theta) * r);
 
-            yield return x;
-            yield return y;
+            yield return new(x, y);
         }
     }
 }

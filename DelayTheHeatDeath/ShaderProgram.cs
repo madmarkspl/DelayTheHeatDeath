@@ -86,11 +86,12 @@ public class ShaderProgram : IDisposable
             layout (location = 0) in vec4 vPos;
         
             uniform mat4 uModel;
+            uniform mat4 uView;
             uniform mat4 uProjection;
 
             void main()
             {
-                gl_Position = uProjection * uModel * vPos;
+                gl_Position = uProjection * uView * uModel * vPos;
             }
             ";
 
