@@ -14,15 +14,14 @@ public class Player
 
     public Transform _transform = new Transform();
 
-    private float _movementSpeed = 0;
-    private float _maxSpeed = 500;
-    private float _acceleration = 500;
-    private float _deceleration = -200;
+    private bool _isAccelerating = false;
+    private float _maxSpeed = 2;
+    private Vector3D<float> _velocity = new();
+    private float _decelerationRate = -0.002f;
+    private float _accelerationRate = 0.006f;
 
     private float _rotationSpeed = 250 * (float)(Math.PI / 180);
     private Vector3D<float> _direction = new Vector3D<float>(0, 1, 0);
-
-    private bool _shouldMove = false;
 
     private bool _shouldRotate => _rotations.Count > 0;
     private List<Direction> _rotations = new List<Direction>();
@@ -57,11 +56,11 @@ public class Player
         {
             if (keyState == KeyState.Pressed)
             {
-                _shouldMove = true;
+                _isAccelerating = true;
             }
             else if (keyState == KeyState.Released)
             {
-                _shouldMove = false;
+                _isAccelerating = false;
             }
         }
         else if (key == Key.Left)
@@ -93,7 +92,18 @@ public class Player
         _vao.Bind();
 
         var colorLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uColor");
-        _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 1.0f, 1.0f).ToSystem());
+        if (_isAccelerating)
+        {
+            _gl.Uniform3(colorLocation, new Vector3D<float>(0.0f, 1.0f, 0.0f).ToSystem());
+        }
+        else if (_velocity.LengthSquared > 0)
+        {
+            _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 0.0f, 0.0f).ToSystem());
+        }
+        else
+        {
+            _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 1.0f, 1.0f).ToSystem());
+        }
 
         var modelLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uModel");
         var modelMatrix = _transform.Matrix;
@@ -106,42 +116,61 @@ public class Player
 
     public void Update(double delta)
     {
-        if (_shouldMove)
-        {
-            if (_movementSpeed < _maxSpeed)
-            {
-                _movementSpeed += _acceleration * (float)delta;
-            }
+        Turn(delta);
 
-            _transform.Position += _movementSpeed * (float)delta * _direction;
-        }
-        else if (_movementSpeed > 0)
-        {
-            _movementSpeed = Math.Max(_movementSpeed + _deceleration * (float)delta, 0);
-
-            _transform.Position += _movementSpeed * (float)delta * _direction;
-        }
-
-        if (_shouldRotate)
-        {
-            Turn(delta);
-        }
+        Move(delta);
 
         _artificialGravity.Update(delta);
         _artificialGravity._transform.Position = _transform.Position;
     }
 
-    public void Turn(double delta)
+    private void Move(double delta)
     {
-        _transform.Rotation += _rotationSpeed * (float)delta * (sbyte)_rotations.Last();
+        var acceleration = 0f;
+        var accelerationVector = Vector3D<float>.Zero;
 
-        _direction = Vector3D.Normalize(new Vector3D<float>((float)-Math.Sin(_transform.Rotation), (float)Math.Cos(_transform.Rotation), 0));
+        if (_isAccelerating)
+        {
+            acceleration = _accelerationRate * (float)delta;
+            accelerationVector = _direction * _accelerationRate;
+        }
+        else if (_velocity.Length > 0)
+        {
+            acceleration = _decelerationRate * (float)delta;
+            accelerationVector = (_velocity / _velocity.Length) * _decelerationRate;
+        }
+
+        _velocity += accelerationVector;
+
+        var speed = _velocity.Length;
+
+        var velNorm = _velocity / speed;
+        var accNorm = accelerationVector / accelerationVector.Length;
+
+        if (speed > _maxSpeed)
+        {
+            _velocity = velNorm * _maxSpeed;
+        }
+
+        var dot = Vector3D.Dot(velNorm, accNorm);
+
+        if (acceleration < 0 && dot >= 0.999)
+        {
+            _velocity = Vector3D<float>.Zero;
+        }
+
+        _transform.Position += _velocity;
     }
 
-    //public void Move(double delta)
-    //{
-    //    _transform.Position += _movementSpeed * (float)delta * _direction;
-    //}
+    private void Turn(double delta)
+    {
+        if (_shouldRotate)
+        {
+            _transform.Rotation += _rotationSpeed * (float)delta * (sbyte)_rotations.Last();
+
+            _direction = Vector3D.Normalize(new Vector3D<float>((float)-Math.Sin(_transform.Rotation), (float)Math.Cos(_transform.Rotation), 0));
+        }
+    }
 
     private static float[] GenerateVertexes(float s)
     {
