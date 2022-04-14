@@ -8,22 +8,29 @@ public class GravityField
     private const int LineSegmentCount = 36;
     private static float[] _vertexes;
 
-    public Transform _transform = new Transform();
-
     private readonly GL _gl;
     private readonly VertexArrayObject<float, uint> _vao;
     private readonly BufferObject<float> _vbo;
+
+    public float Power { get; private set; }
+
+    public float Radius { get; private set; }
+
+    public Transform Transform { get; private set; } = new Transform();
 
     static GravityField()
     {
         _vertexes = GenerateVertexes(0, 2 * MathF.PI, LineSegmentCount).ToArray();
     }
 
-    public GravityField(GL gl, float x, float y)
+    public GravityField(GL gl, float x, float y, float radius, float power)
     {
         _gl = gl;
 
-        _transform.Position = new Vector3D<float>(x, y, 0);
+        Transform.Position = new Vector3D<float>(x, y, 0);
+        Radius = radius;
+        Transform.Scale = Radius;
+        Power = power;
 
         _vbo = new BufferObject<float>(_gl, _vertexes, BufferTargetARB.ArrayBuffer);
         _vao = new VertexArrayObject<float, uint>(_gl, _vbo, default);
@@ -33,6 +40,10 @@ public class GravityField
 
     public void Update(double delta)
     {
+        // testing of collapsing field
+        //Radius -= 1f * (float) delta;
+        //Transform.Scale = Radius;
+
         //var displacementX = (_rng.NextSingle() - 0.5f);
         //var displacementY = (_rng.NextSingle() - 0.5f);
 
@@ -47,7 +58,7 @@ public class GravityField
         _gl.Uniform3(colorLocation, new Vector3D<float>(0.2f, 0.8f, 0.7f).ToSystem());
 
         var modelLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uModel");
-        var modelMatrix = _transform.Matrix;
+        var modelMatrix = Transform.Matrix;
 
         _gl.UniformMatrix4(modelLocation, 1, false, (float*)&modelMatrix);
 
@@ -66,8 +77,8 @@ public class GravityField
         {
             var angle = startAngle + angleIncrement * i;
 
-            var x = MathF.Cos(angle) * xRadius;
-            var y = MathF.Sin(angle) * yRadius;
+            var x = MathF.Cos(angle);
+            var y = MathF.Sin(angle);
 
             Console.WriteLine($"({x}, {y})");
 

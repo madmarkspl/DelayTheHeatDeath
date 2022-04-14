@@ -33,13 +33,15 @@ internal class TheGame
     private Player _player;
     private List<Star> _stars = new List<Star>();
 
+    private GravityField _blackHole;
+
     public TheGame()
     {
         var options = WindowOptions.Default;
         options.Size = new Vector2D<int>(_width, _height);
         options.Title = "Delay The Heat Death - Ludum Dare 50 Compo entry";
         options.VSync = false;
-        //options.UpdatesPerSecond = 60;
+        options.UpdatesPerSecond = 60;
         //options.FramesPerSecond = 60;
 
         _window = Window.Create(options);
@@ -78,7 +80,7 @@ internal class TheGame
 
         //_points = GeneratePoints(2000, 10000);
 
-        foreach (var point in GeneratePoints(2000, 1000))
+        foreach (var point in GeneratePoints(200, 200))
         {
             _stars.Add(new(_gl, _rng, point.X, point.Y));
         }
@@ -98,6 +100,7 @@ internal class TheGame
         _shaderProgram.Use();
 
         _player = new Player(_gl);
+        _blackHole = new GravityField(_gl, 0, 0, 100, 10);
 
         _stopwatch.Start();
     }
@@ -106,20 +109,28 @@ internal class TheGame
     {
         foreach (var star in _stars)
         {
-            star.Update(delta);
+            foreach (var otherStar in _stars.Where(s => s != star))
+            {
+                star.Interact(otherStar._antiGravity);
+            }
 
-            _player.Interact(star);
+            star.Interact(_player._artificialGravity);
+            star.Interact(_blackHole);
+
+            star.Update(delta);
         }
 
         _player.Update(delta);
 
         _viewTransform.Position = -_player._transform.Position;
 
-        if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
-        {
-            Console.WriteLine($"{(int)(1 / delta)}");
-            _stopwatch.Restart();
-        }
+        //if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
+        //{
+        //    Console.WriteLine($"{(int)(1 / delta)}");
+        //    _stopwatch.Restart();
+        //}
+
+        _blackHole.Update(delta);
     }
 
     private unsafe void OnRender(double delta)
@@ -146,6 +157,8 @@ internal class TheGame
         //_gl.DrawArrays(PrimitiveType.Points, 0, 10000);
 
         _player.Render(delta);
+
+        _blackHole.Render(delta);
     }
 
     private void KeyDown(IKeyboard arg1, Key key, int arg3)

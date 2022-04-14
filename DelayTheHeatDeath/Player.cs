@@ -12,13 +12,11 @@ public class Player
     private readonly VertexArrayObject<float, uint> _vao;
     private readonly BufferObject<float> _vbo;
 
-    public Transform _transform = new Transform();
-
     private bool _isAccelerating = false;
-    private float _maxSpeed = 2;
-    private Vector3D<float> _velocity = new();
-    private float _decelerationRate = -0.002f;
-    private float _accelerationRate = 0.006f;
+    private float _maxSpeed = 10;
+    private Vector3D<float> _velocity = Vector3D<float>.Zero;
+    private float _decelerationRate = -0.02f;
+    private float _accelerationRate = 0.06f;
 
     private float _rotationSpeed = 250 * (float)(Math.PI / 180);
     private Vector3D<float> _direction = new Vector3D<float>(0, 1, 0);
@@ -26,7 +24,9 @@ public class Player
     private bool _shouldRotate => _rotations.Count > 0;
     private List<Direction> _rotations = new List<Direction>();
 
-    private GravityField _artificialGravity;
+    public GravityField _artificialGravity;
+
+    public Transform _transform { get; private set; } = new Transform();
 
     static Player()
     {
@@ -42,7 +42,7 @@ public class Player
         
         _vao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, 2, 0);
 
-        _artificialGravity = new GravityField(_gl, 0, 0);
+        _artificialGravity = new GravityField(_gl, 0, 0, 100, 10f);
     }
 
     internal void Interact(Star star)
@@ -92,6 +92,8 @@ public class Player
         _vao.Bind();
 
         var colorLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uColor");
+
+        // temporarily change color of ship; will be replaced by exhaust particles later
         if (_isAccelerating)
         {
             _gl.Uniform3(colorLocation, new Vector3D<float>(0.0f, 1.0f, 0.0f).ToSystem());
@@ -120,8 +122,8 @@ public class Player
 
         Move(delta);
 
-        _artificialGravity.Update(delta);
-        _artificialGravity._transform.Position = _transform.Position;
+        //_artificialGravity.Update(delta);
+        _artificialGravity.Transform.Position = _transform.Position;
     }
 
     private void Move(double delta)
