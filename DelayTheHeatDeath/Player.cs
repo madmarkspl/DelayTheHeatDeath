@@ -26,7 +26,9 @@ public class Player
 
     public GravityField _artificialGravity;
 
-    public Transform _transform { get; private set; } = new Transform();
+    public Transform Transform { get; private set; } = new Transform();
+
+    private ParticleEmitter _exhaustEmitter;
 
     static Player()
     {
@@ -43,6 +45,8 @@ public class Player
         _vao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, 2, 0);
 
         _artificialGravity = new GravityField(_gl, 0, 0, 100, 10f);
+
+        _exhaustEmitter = new ParticleEmitter(_gl, ShaderProgram.Simple.UProjectionMatrix, new Vector2D<float>(0, -15), 50000);
     }
 
     internal void Interact(Star star)
@@ -57,10 +61,12 @@ public class Player
             if (keyState == KeyState.Pressed)
             {
                 _isAccelerating = true;
+                _exhaustEmitter.Start();
             }
             else if (keyState == KeyState.Released)
             {
                 _isAccelerating = false;
+                _exhaustEmitter.Stop();
             }
         }
         else if (key == Key.Left)
@@ -108,12 +114,14 @@ public class Player
         }
 
         var modelLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uModel");
-        var modelMatrix = _transform.Matrix;
+        var modelMatrix = Transform.Matrix;
         _gl.UniformMatrix4(modelLocation, 1, false, (float*)&modelMatrix);
 
         _gl.DrawArrays(PrimitiveType.LineLoop, 0, 11);
 
         _artificialGravity.Render(delta);
+
+        _exhaustEmitter.Render(delta);
     }
 
     public void Update(double delta)
@@ -123,7 +131,17 @@ public class Player
         Move(delta);
 
         //_artificialGravity.Update(delta);
-        _artificialGravity.Transform.Position = _transform.Position;
+        _artificialGravity.Transform.Position = Transform.Position;
+        _exhaustEmitter.Transform.Position = -Transform.Position;
+
+        if (_isAccelerating)
+        {
+            _exhaustEmitter.Position = Transform.Position;
+            _exhaustEmitter.Rotation = Transform.Rotation;
+            _exhaustEmitter.Velocity = _velocity;
+        }
+
+        _exhaustEmitter.Update(delta);
     }
 
     private void Move(double delta)
@@ -161,16 +179,16 @@ public class Player
             _velocity = Vector3D<float>.Zero;
         }
 
-        _transform.Position += _velocity;
+        Transform.Position += _velocity;
     }
 
     private void Turn(double delta)
     {
         if (_shouldRotate)
         {
-            _transform.Rotation += _rotationSpeed * (float)delta * (sbyte)_rotations.Last();
+            Transform.Rotation += _rotationSpeed * (float)delta * (sbyte)_rotations.Last();
 
-            _direction = Vector3D.Normalize(new Vector3D<float>((float)-Math.Sin(_transform.Rotation), (float)Math.Cos(_transform.Rotation), 0));
+            _direction = Vector3D.Normalize(new Vector3D<float>((float)-Math.Sin(Transform.Rotation), (float)Math.Cos(Transform.Rotation), 0));
         }
     }
 

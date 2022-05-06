@@ -28,6 +28,15 @@ public class BufferObject<TDataType> : IDisposable
         _gl.BindBuffer(_bufferType, _handle);
     }
 
+    public unsafe void UpdateData(Span<TDataType> data, int offset = 0)
+    {
+        fixed (void* d = data)
+        {
+            // todo: check for buffer size
+            _gl.BufferSubData(_bufferType, offset, (nuint)(data.Length * sizeof(TDataType)), d);
+        }
+    }
+
     public void Dispose()
     {
         _gl.DeleteBuffer(_handle);

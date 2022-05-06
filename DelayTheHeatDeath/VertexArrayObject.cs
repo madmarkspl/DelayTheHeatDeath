@@ -9,15 +9,24 @@ public class VertexArrayObject<TVertexType, TIndexType> : IDisposable
     private readonly GL _gl;
     private readonly uint _handle;
 
+    private readonly BufferObject<TVertexType> _vbo;
+
     public VertexArrayObject(GL gl, BufferObject<TVertexType> vbo, BufferObject<TIndexType>? ebo)
     {
         _gl = gl;
         _handle = _gl.GenVertexArray();
+        _vbo = vbo;
 
         Bind();
 
-        vbo.Bind();
+        _vbo.Bind();
         ebo?.Bind();
+    }
+
+    public unsafe void VertexAttributePointerAbs(uint index, int count, VertexAttribPointerType type, uint vertexSize, int offSet)
+    {
+        _gl.VertexAttribPointer(index, count, type, false, vertexSize, (void*)offSet);
+        _gl.EnableVertexAttribArray(index);
     }
 
     public unsafe void VertexAttributePointer(uint index, int count, VertexAttribPointerType type, uint vertexSize, int offSet)

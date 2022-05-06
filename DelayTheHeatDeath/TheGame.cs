@@ -35,6 +35,8 @@ internal class TheGame
 
     private GravityField _blackHole;
 
+    private ParticleEmitter _particleEmitter;
+
     public TheGame()
     {
         var options = WindowOptions.Default;
@@ -96,11 +98,15 @@ internal class TheGame
         _gl.Enable(EnableCap.DepthTest);
         //_gl.Enable(EnableCap.CullFace);
         //_gl.CullFace(CullFaceMode.Back);
+        _gl.Enable(GLEnum.Blend);
+        _gl.BlendFunc(GLEnum.SrcAlpha, GLEnum.OneMinusSrcAlpha);
 
         _shaderProgram.Use();
 
         _player = new Player(_gl);
         _blackHole = new GravityField(_gl, 0, 0, 100, 10);
+
+        _particleEmitter = new ParticleEmitter(_gl, ShaderProgram.Simple.UProjectionMatrix, new Vector2D<float>(0, 0), 5000);
 
         _stopwatch.Start();
     }
@@ -122,7 +128,7 @@ internal class TheGame
 
         _player.Update(delta);
 
-        _viewTransform.Position = -_player._transform.Position;
+        _viewTransform.Position = -_player.Transform.Position;
 
         //if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
         //{
@@ -131,12 +137,15 @@ internal class TheGame
         //}
 
         _blackHole.Update(delta);
+        _particleEmitter.Update(delta);
     }
 
     private unsafe void OnRender(double delta)
     {
         _gl.Clear((uint)(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit));
-        
+
+        _shaderProgram.Use();
+
         _vao.Bind();
 
         var viewLocation = _gl.GetUniformLocation(_shaderProgram, "uView");
@@ -156,9 +165,11 @@ internal class TheGame
 
         //_gl.DrawArrays(PrimitiveType.Points, 0, 10000);
 
+        _blackHole.Render(delta);
+
         _player.Render(delta);
 
-        _blackHole.Render(delta);
+        _particleEmitter.Render(delta);
     }
 
     private void KeyDown(IKeyboard arg1, Key key, int arg3)
@@ -166,6 +177,42 @@ internal class TheGame
         if (key == Key.Escape)
         {
             _window.Close();
+            return;
+        }
+
+        if (key == Key.Q)
+        {
+            _particleEmitter.Start();
+            return;
+        }
+
+        if (key == Key.E)
+        {
+            _particleEmitter.Stop();
+            return;
+        }
+
+        if (key == Key.W)
+        {
+            _particleEmitter.Transform.Position += new Vector3D<float>(0, 1, 0);
+            return;
+        }
+
+        if (key == Key.S)
+        {
+            _particleEmitter.Transform.Position += new Vector3D<float>(0, -1, 0);
+            return;
+        }
+
+        if (key == Key.A)
+        {
+            _particleEmitter.Transform.Position += new Vector3D<float>(-1, 0, 0);
+            return;
+        }
+
+        if (key == Key.D)
+        {
+            _particleEmitter.Transform.Position += new Vector3D<float>(1, 0, 0);
             return;
         }
 
