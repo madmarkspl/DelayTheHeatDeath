@@ -21,7 +21,7 @@ public class ParticleEmitter
 
     private readonly Random _rng = new Random();
 
-    public unsafe ParticleEmitter(GL gl, Matrix4X4<float> projection, Vector2D<float> offset, uint size)
+    public unsafe ParticleEmitter(GL gl, Vector2D<float> offset, uint size)
     {
         _gl = gl;
         _offset = offset;
@@ -31,7 +31,7 @@ public class ParticleEmitter
         var vertexSource = File.ReadAllText("Shaders/particles.vert");
         var fragmentSource = File.ReadAllText("Shaders/particles.frag");
 
-        _program = new ShaderProgram(_gl, vertexSource, fragmentSource, projection);
+        _program = new ShaderProgram(_gl, vertexSource, fragmentSource);
 
         _particles = new Particle[_size];
 
@@ -51,10 +51,6 @@ public class ParticleEmitter
 
     public Transform Transform { get; private set; } = new Transform();
 
-    public float Rotation { get; set; }
-
-    public Vector3D<float> Position { get; set; }
-
     public Vector3D<float> Velocity { get; set; }
 
     public unsafe void Render(double delta)
@@ -62,14 +58,6 @@ public class ParticleEmitter
         _program.Use();
 
         _vao.Bind();
-
-        var viewLocation = _gl.GetUniformLocation(_program, "uView");
-        var viewMatrix = Transform.Matrix;
-        _gl.UniformMatrix4(viewLocation, 1, false, (float*)&viewMatrix);
-
-        var modelLocation = _gl.GetUniformLocation(_program, "uModel");
-        var modelMatrix = Transform.Matrix;
-        _gl.UniformMatrix4(modelLocation, 1, false, (float*)&modelMatrix);
 
         _gl.DrawArrays(PrimitiveType.Points, 0, _activeParticlesCount);
     }
@@ -104,8 +92,8 @@ public class ParticleEmitter
 
         if (IsEmitting)
         {
-            var rotSin = MathF.Sin(Rotation);
-            var rotCos = MathF.Cos(Rotation);
+            var rotSin = MathF.Sin(Transform.Rotation);
+            var rotCos = MathF.Cos(Transform.Rotation);
 
             var positionOffset = new Vector2D<float>(rotCos * _offset.X - rotSin * _offset.Y, rotSin * _offset.X + rotCos * _offset.Y);
             var parentVelocity = new Vector2D<float>(Velocity.X, Velocity.Y);
@@ -113,10 +101,10 @@ public class ParticleEmitter
             for (int i = 0; i < _newParticlesCount && _activeParticlesCount < _size; i++)
             {
                 var angleVariation = _rng.NextSingle() - 0.5f;
-                var direction = -Vector2D.Normalize(new Vector2D<float>(-MathF.Sin(Rotation + angleVariation), MathF.Cos(Rotation + angleVariation)));
+                var direction = -Vector2D.Normalize(new Vector2D<float>(-MathF.Sin(Transform.Rotation + angleVariation), MathF.Cos(Transform.Rotation + angleVariation)));
                 var life = _rng.NextSingle() / 2.0f + 0.5f;
 
-                _particles[_activeParticlesCount].Position = new Vector2D<float>(Position.X, Position.Y) + positionOffset;
+                _particles[_activeParticlesCount].Position = new Vector2D<float>(Transform.Position.X, Transform.Position.Y) + positionOffset;
 
                 // https://www.desmos.com/calculator/yb4n5yxpow
                 // https://www.desmos.com/calculator/vkxgeqyykn

@@ -5,20 +5,13 @@ namespace DelayTheHeatDeath;
 
 public class ShaderProgram : IDisposable
 {
-    public static ShaderProgram Simple { get; set; }
-
     private readonly GL _gl;
     private readonly uint _handle;
 
-    public Matrix4X4<float> UProjectionMatrix;
-    private readonly int _uProjectionMatrixLocation;
-
-    public ShaderProgram(GL gl, string vertexSource, string fragmentSource, Matrix4X4<float> projectionMatrix)
+    public ShaderProgram(GL gl, string vertexSource, string fragmentSource)
     {
         _gl = gl;
         _handle = _gl.CreateProgram();
-
-        UProjectionMatrix = projectionMatrix;
 
         var vertex = AddShader(ShaderType.VertexShader, vertexSource);
         var fragment = AddShader(ShaderType.FragmentShader, fragmentSource);
@@ -34,29 +27,30 @@ public class ShaderProgram : IDisposable
             Console.WriteLine($"Error linking shader program '{_gl.GetProgramInfoLog(_handle)}'.");
         }
 
+        var vpMatricesBlockIndex = _gl.GetUniformBlockIndex(this, "VPMatrices");
+        // binds program uniform index to context binding point
+        _gl.UniformBlockBinding(this, vpMatricesBlockIndex, VPMatricesUniformBindingIndex);
+
         _gl.DetachShader(_handle, vertex);
         _gl.DeleteShader(vertex);
 
         _gl.DetachShader(_handle, fragment);
         _gl.DeleteShader(fragment);
 
-        _gl.UseProgram(_handle);
-
-        _uProjectionMatrixLocation = _gl.GetUniformLocation(_handle, "uProjection");
-
         _gl.UseProgram(0);
     }
 
     public static implicit operator uint(ShaderProgram p) => p._handle;
 
+    public static ShaderProgram Simple { get; set; }
+
+    public static BufferObject<Matrix4X4<float>> VPMatricesUbo { get; private set; }
+
+    public static uint VPMatricesUniformBindingIndex { get; private set; }
+
     public unsafe void Use()
     {
         _gl.UseProgram(_handle);
-
-        fixed (Matrix4X4<float>* ptr = &UProjectionMatrix)
-        {
-            _gl.UniformMatrix4(_uProjectionMatrixLocation, 1, false, (float*)ptr);
-        }
     }
 
     public void Dispose()
@@ -79,34 +73,28 @@ public class ShaderProgram : IDisposable
         return shader;
     }
 
-    public static void SetupSimpleShaderProgram(GL gl, Matrix4X4<float> projectionMatrix)
+    public static void Setup(GL gl)
     {
-        const string VertexShaderSource = @"
-            #version 330 core
-            layout (location = 0) in vec4 vPos;
-        
-            uniform mat4 uModel;
-            uniform mat4 uView;
-            uniform mat4 uProjection;
+        SetupVPMatricesUniformBuffer(gl);
+        SetupSimpleShaderProgram(gl);
+    }
 
-            void main()
-            {
-                gl_Position = uProjection * uView * uModel * vPos;
-            }
-            ";
+    private static void SetupSimpleShaderProgram(GL gl)
+    {
+        var vertexShaderSource = File.ReadAllText("Shaders/simple.vert");
+        var fragmentShaderSource = File.ReadAllText("Shaders/simple.frag");
 
-        const string FragmentShaderSource = @"
-            #version 330 core
+        Simple = new ShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+    }
 
-            uniform vec3 uColor;
+    private static void SetupVPMatricesUniformBuffer(GL gl)
+    {
+        VPMatricesUniformBindingIndex = 0;
 
-            out vec4 FragColor;
-            void main()
-            {
-                FragColor = vec4(uColor, 1.0f);
-            }
-            ";
+        var initializationArray = new Matrix4X4<float>[2];
 
-        Simple = new ShaderProgram(gl, VertexShaderSource, FragmentShaderSource, projectionMatrix);
+        VPMatricesUbo = new BufferObject<Matrix4X4<float>>(gl, initializationArray, BufferTargetARB.UniformBuffer, BufferUsageARB.DynamicDraw);
+
+        gl.BindBufferBase(GLEnum.UniformBuffer, VPMatricesUniformBindingIndex, VPMatricesUbo);
     }
 }

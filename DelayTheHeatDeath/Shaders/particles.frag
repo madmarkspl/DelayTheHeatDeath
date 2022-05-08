@@ -1,4 +1,4 @@
-﻿#version 410 core
+﻿#version 420 core
 //in vec2 TexCoords;
 in vec4 ParticleColor;
 in float Life;

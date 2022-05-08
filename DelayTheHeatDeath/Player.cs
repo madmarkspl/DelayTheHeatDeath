@@ -46,7 +46,7 @@ public class Player
 
         _artificialGravity = new GravityField(_gl, 0, 0, 100, 10f);
 
-        _exhaustEmitter = new ParticleEmitter(_gl, ShaderProgram.Simple.UProjectionMatrix, new Vector2D<float>(0, -15), 50000);
+        _exhaustEmitter = new ParticleEmitter(_gl, new Vector2D<float>(0, -15), 50000);
     }
 
     internal void Interact(Star star)
@@ -132,16 +132,14 @@ public class Player
 
         //_artificialGravity.Update(delta);
         _artificialGravity.Transform.Position = Transform.Position;
-        _exhaustEmitter.Transform.Position = -Transform.Position;
 
         if (_isAccelerating)
         {
-            _exhaustEmitter.Position = Transform.Position;
-            _exhaustEmitter.Rotation = Transform.Rotation;
+            _exhaustEmitter.Transform.Position = Transform.Position;
+            _exhaustEmitter.Transform.Rotation = Transform.Rotation;
             _exhaustEmitter.Velocity = _velocity;
+            _exhaustEmitter.Update(delta);
         }
-
-        _exhaustEmitter.Update(delta);
     }
 
     private void Move(double delta)

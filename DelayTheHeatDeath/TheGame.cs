@@ -22,13 +22,10 @@ internal class TheGame
     private VertexArrayObject<float, uint> _vao;
     private BufferObject<float> _vbo;
 
-    private Matrix4X4<float> _modelMatrix = Matrix4X4<float>.Identity;
     private Matrix4X4<float> _projectionMatrix = Matrix4X4<float>.Identity;
 
     // TODO: 
     private Transform _viewTransform = new Transform();
-    private Vector3D<float> _direction = new Vector3D<float>(0, -1, 0);
-    private float _rotation = 0;
 
     private Player _player;
     private List<Star> _stars = new List<Star>();
@@ -41,7 +38,7 @@ internal class TheGame
     {
         var options = WindowOptions.Default;
         options.Size = new Vector2D<int>(_width, _height);
-        options.Title = "Delay The Heat Death - Ludum Dare 50 Compo entry";
+        options.Title = "Delay The Heat Death";
         options.VSync = false;
         options.UpdatesPerSecond = 60;
         //options.FramesPerSecond = 60;
@@ -60,7 +57,7 @@ internal class TheGame
         _window.Run();
     }
 
-    private void OnLoad()
+    private unsafe void OnLoad()
     {
         var input = _window.CreateInput();
 
@@ -76,7 +73,9 @@ internal class TheGame
 
         _projectionMatrix = Matrix4X4.CreateOrthographic(_width, _height, 0.01f, 100.0f);
 
-        ShaderProgram.SetupSimpleShaderProgram(_gl, _projectionMatrix);
+        ShaderProgram.Setup(_gl);
+
+        ShaderProgram.VPMatricesUbo.UpdateData(new[] { _projectionMatrix }, sizeof(Matrix4X4<float>));
 
         _shaderProgram = ShaderProgram.Simple;
 
@@ -106,7 +105,7 @@ internal class TheGame
         _player = new Player(_gl);
         _blackHole = new GravityField(_gl, 0, 0, 100, 10);
 
-        _particleEmitter = new ParticleEmitter(_gl, ShaderProgram.Simple.UProjectionMatrix, new Vector2D<float>(0, 0), 5000);
+        _particleEmitter = new ParticleEmitter(_gl, new Vector2D<float>(0, 0), 5000);
 
         _stopwatch.Start();
     }
@@ -138,6 +137,8 @@ internal class TheGame
 
         _blackHole.Update(delta);
         _particleEmitter.Update(delta);
+
+        ShaderProgram.VPMatricesUbo.UpdateData(new[] { _viewTransform.Matrix });
     }
 
     private unsafe void OnRender(double delta)
@@ -147,10 +148,6 @@ internal class TheGame
         _shaderProgram.Use();
 
         _vao.Bind();
-
-        var viewLocation = _gl.GetUniformLocation(_shaderProgram, "uView");
-        var viewMatrix = _viewTransform.Matrix;
-        _gl.UniformMatrix4(viewLocation, 1, false, (float*)&viewMatrix);
 
         foreach (var star in _stars)
         {

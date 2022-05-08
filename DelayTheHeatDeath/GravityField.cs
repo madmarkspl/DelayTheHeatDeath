@@ -12,12 +12,6 @@ public class GravityField
     private readonly VertexArrayObject<float, uint> _vao;
     private readonly BufferObject<float> _vbo;
 
-    public float Power { get; private set; }
-
-    public float Radius { get; private set; }
-
-    public Transform Transform { get; private set; } = new Transform();
-
     static GravityField()
     {
         _vertexes = GenerateVertexes(0, 2 * MathF.PI, LineSegmentCount).ToArray();
@@ -37,6 +31,12 @@ public class GravityField
 
         _vao.VertexAttributePointer(0, 2, VertexAttribPointerType.Float, 2, 0);
     }
+
+    public float Power { get; private set; }
+
+    public float Radius { get; private set; }
+
+    public Transform Transform { get; private set; } = new Transform();
 
     public void Update(double delta)
     {
@@ -59,7 +59,6 @@ public class GravityField
 
         var modelLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uModel");
         var modelMatrix = Transform.Matrix;
-
         _gl.UniformMatrix4(modelLocation, 1, false, (float*)&modelMatrix);
 
         _gl.DrawArrays(PrimitiveType.LineLoop, 0, LineSegmentCount);

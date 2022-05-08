@@ -9,7 +9,7 @@ public class BufferObject<TDataType> : IDisposable
     private readonly GL _gl;
     private readonly uint _handle;
 
-    public unsafe BufferObject(GL gl, Span<TDataType> data, BufferTargetARB bufferType)
+    public unsafe BufferObject(GL gl, Span<TDataType> data, BufferTargetARB bufferType, BufferUsageARB bufferUsage = BufferUsageARB.StaticDraw)
     {
         _bufferType = bufferType;
         _gl = gl;
@@ -19,9 +19,11 @@ public class BufferObject<TDataType> : IDisposable
 
         fixed (void* d = data)
         {
-            _gl.BufferData(bufferType, (nuint)(data.Length * sizeof(TDataType)), d, BufferUsageARB.StaticDraw);
+            _gl.BufferData(bufferType, (nuint)(data.Length * sizeof(TDataType)), d, bufferUsage);
         }
     }
+
+    public static implicit operator uint(BufferObject<TDataType> bo) => bo._handle;
 
     public void Bind()
     {
