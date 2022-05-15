@@ -23,7 +23,7 @@ public class GravityField
 
         Transform.Position = new Vector3D<float>(x, y, 0);
         Radius = radius;
-        Transform.Scale = Radius;
+        Transform.Scale = new Vector3D<float>(Radius);
         Power = power;
 
         _vbo = new BufferObject<float>(_gl, _vertexes, BufferTargetARB.ArrayBuffer);

@@ -17,7 +17,6 @@ internal class TheGame
     private GL _gl;
     private Stopwatch _stopwatch = new Stopwatch();
 
-    private float[] _points;
     private ShaderProgram? _shaderProgram;
     private VertexArrayObject<float, uint> _vao;
     private BufferObject<float> _vbo;
@@ -33,6 +32,8 @@ internal class TheGame
     private GravityField _blackHole;
 
     private ParticleEmitter _particleEmitter;
+
+    private Grid _grid;
 
     public TheGame()
     {
@@ -79,8 +80,6 @@ internal class TheGame
 
         _shaderProgram = ShaderProgram.Simple;
 
-        //_points = GeneratePoints(2000, 10000);
-
         foreach (var point in GeneratePoints(200, 200))
         {
             _stars.Add(new(_gl, _rng, point.X, point.Y));
@@ -107,11 +106,21 @@ internal class TheGame
 
         _particleEmitter = new ParticleEmitter(_gl, new Vector2D<float>(0, 0), 5000);
 
+        _grid = new Grid(_gl);
+        _grid.Transform.Scale = new Vector3D<float>(_width / 2.0f, _height / 2.0f, 0.0f);
+
         _stopwatch.Start();
     }
 
     private void OnUpdate(double delta)
     {
+        //if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
+        //{
+        //    //Console.WriteLine($"{(int)(1 / delta)}");
+        //    Console.Clear();
+        //    _stopwatch.Restart();
+        //}
+
         foreach (var star in _stars)
         {
             foreach (var otherStar in _stars.Where(s => s != star))
@@ -128,15 +137,13 @@ internal class TheGame
         _player.Update(delta);
 
         _viewTransform.Position = -_player.Transform.Position;
-
-        //if (_stopwatch.Elapsed > TimeSpan.FromSeconds(1))
-        //{
-        //    Console.WriteLine($"{(int)(1 / delta)}");
-        //    _stopwatch.Restart();
-        //}
-
+        
         _blackHole.Update(delta);
-        _particleEmitter.Update(delta);
+        //_particleEmitter.Update(delta);
+
+        _grid.Transform.Position = _player.Transform.Position;
+
+        _grid.Update(delta);
 
         ShaderProgram.VPMatricesUbo.UpdateData(new[] { _viewTransform.Matrix });
     }
@@ -154,19 +161,13 @@ internal class TheGame
             star.Render(delta);
         }
 
-        //var modelLocation = _gl.GetUniformLocation(_shaderProgram, "uModel");
-        //fixed (Matrix4X4<float>* mat = &_modelMatrix)
-        //{
-        //    _gl.UniformMatrix4(modelLocation, 1, false, (float*)mat);
-        //}
-
-        //_gl.DrawArrays(PrimitiveType.Points, 0, 10000);
-
         _blackHole.Render(delta);
 
         _player.Render(delta);
 
-        _particleEmitter.Render(delta);
+        //_particleEmitter.Render(delta);
+
+        _grid.Render(delta);
     }
 
     private void KeyDown(IKeyboard arg1, Key key, int arg3)
@@ -186,6 +187,12 @@ internal class TheGame
         if (key == Key.E)
         {
             _particleEmitter.Stop();
+            return;
+        }
+
+        if (key == Key.V)
+        {
+            VectorVisualizer.IsActive = !VectorVisualizer.IsActive;
             return;
         }
 
