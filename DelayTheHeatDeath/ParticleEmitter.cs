@@ -21,6 +21,8 @@ public class ParticleEmitter
 
     private readonly Random _rng = new Random();
 
+    private VectorVisualizer _vecVis;
+
     public unsafe ParticleEmitter(GL gl, Vector2D<float> offset, uint size)
     {
         _gl = gl;
@@ -45,6 +47,8 @@ public class ParticleEmitter
         _vao.VertexAttributePointerAbs(0, 2, VertexAttribPointerType.Float, (uint)sizeof(Particle), 0);
         _vao.VertexAttributePointerAbs(1, 4, VertexAttribPointerType.Float, (uint)sizeof(Particle), 2 * sizeof(Vector2D<float>));
         _vao.VertexAttributePointerAbs(2, 1, VertexAttribPointerType.Float, (uint)sizeof(Particle), 2 * sizeof(Vector2D<float>) + sizeof(Vector4D<float>));
+
+        _vecVis = new VectorVisualizer(_gl);
     }
 
     public bool IsEmitting { get; private set; }
@@ -60,12 +64,19 @@ public class ParticleEmitter
         _vao.Bind();
 
         _gl.DrawArrays(PrimitiveType.Points, 0, _activeParticlesCount);
+
+        for (int i = 0; i < _activeParticlesCount; i++)
+        {
+            if (_particles[i].Life > 0.0f)
+            {
+                _vecVis.Transform.Position = new Vector3D<float>(_particles[i].Position.X, _particles[i].Position.Y, 0.0f);
+                _vecVis.Render(new Vector3D<float>(_particles[i].Velocity.X, _particles[i].Velocity.Y, 0.0f) , Velocity.Length + _particles[i].Velocity.Length, new Vector3D<float>(1f, 1f, 0f));
+            }
+        }
     }
 
     public void Update(double delta)
     {
-        var before = _activeParticlesCount;
-        
         int lastParticleIndex = (int)_activeParticlesCount - 1;
         for (int i = lastParticleIndex; i >= 0; i--)
         {
@@ -84,9 +95,9 @@ public class ParticleEmitter
         {
             if (_particles[i].Life > 0.0f)
             {
-                _particles[i].Position += _particles[i].Velocity;
+                _particles[i].Position += _particles[i].Velocity * (float)delta;
 
-                _particles[i].Life -= 0.02f;
+                _particles[i].Life -= 0.5f * (float)delta;
             }
         }
 
@@ -96,7 +107,7 @@ public class ParticleEmitter
             var rotCos = MathF.Cos(Transform.Rotation);
 
             var positionOffset = new Vector2D<float>(rotCos * _offset.X - rotSin * _offset.Y, rotSin * _offset.X + rotCos * _offset.Y);
-            var parentVelocity = new Vector2D<float>(Velocity.X, Velocity.Y);
+            var velocity = new Vector2D<float>(Velocity.X, Velocity.Y);
 
             for (int i = 0; i < _newParticlesCount && _activeParticlesCount < _size; i++)
             {
@@ -115,8 +126,8 @@ public class ParticleEmitter
                 _particles[_activeParticlesCount].Color = new Vector4D<float>(colorEquation, 1f - colorEquation, 0.0f, alphaEquation);
 
                 _particles[_activeParticlesCount].Velocity =
-                    parentVelocity
-                    + direction * Math.Clamp(_rng.NextSingle(), 0.01f, 1f) * 5;
+                    velocity
+                    + direction * Math.Clamp(_rng.NextSingle(), 0.01f, 1f) * 500;
 
                 _particles[_activeParticlesCount].Life = life;
 
@@ -126,6 +137,8 @@ public class ParticleEmitter
 
         _vbo.Bind();
         _vbo.UpdateData(_particles);
+
+        //Console.WriteLine($"Part: {_particles[0].Velocity}");
     }
 
     public void Start()

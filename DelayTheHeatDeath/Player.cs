@@ -13,12 +13,13 @@ public class Player
     private readonly BufferObject<float> _vbo;
 
     private bool _isAccelerating = false;
-    private float _maxSpeed = 10;
+    private float _maxSpeed = 1000;
     private Vector3D<float> _velocity = Vector3D<float>.Zero;
-    private float _decelerationRate = -0.02f;
-    private float _accelerationRate = 0.06f;
+    private float _decelerationRate = -100.0f;
+    private float _accelerationRate = 300.0f; 
+    private Vector3D<float> _accelerationVector = Vector3D<float>.Zero;
 
-    private float _rotationSpeed = 250 * (float)(Math.PI / 180);
+    private float _rotationSpeed = 250 * (MathF.PI / 180);
     private Vector3D<float> _direction = new Vector3D<float>(0, 1, 0);
 
     private bool _shouldRotate => _rotations.Count > 0;
@@ -29,6 +30,8 @@ public class Player
     public Transform Transform { get; private set; } = new Transform();
 
     private ParticleEmitter _exhaustEmitter;
+
+    private VectorVisualizer _vecVis;
 
     static Player()
     {
@@ -46,7 +49,9 @@ public class Player
 
         _artificialGravity = new GravityField(_gl, 0, 0, 100, 10f);
 
-        _exhaustEmitter = new ParticleEmitter(_gl, new Vector2D<float>(0, -15), 50000);
+        _exhaustEmitter = new ParticleEmitter(_gl, new Vector2D<float>(0, -15), 1000);
+
+        _vecVis = new VectorVisualizer(_gl);
     }
 
     internal void Interact(Star star)
@@ -100,15 +105,15 @@ public class Player
         var colorLocation = _gl.GetUniformLocation(ShaderProgram.Simple, "uColor");
 
         // temporarily change color of ship; will be replaced by exhaust particles later
-        if (_isAccelerating)
-        {
-            _gl.Uniform3(colorLocation, new Vector3D<float>(0.0f, 1.0f, 0.0f).ToSystem());
-        }
-        else if (_velocity.LengthSquared > 0)
-        {
-            _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 0.0f, 0.0f).ToSystem());
-        }
-        else
+        //if (_isAccelerating)
+        //{
+        //    _gl.Uniform3(colorLocation, new Vector3D<float>(0.0f, 1.0f, 0.0f).ToSystem());
+        //}
+        //else if (_velocity.LengthSquared > 0)
+        //{
+        //    _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 0.0f, 0.0f).ToSystem());
+        //}
+        //else
         {
             _gl.Uniform3(colorLocation, new Vector3D<float>(1.0f, 1.0f, 1.0f).ToSystem());
         }
@@ -122,6 +127,15 @@ public class Player
         _artificialGravity.Render(delta);
 
         _exhaustEmitter.Render(delta);
+
+        //_vecVis.Render(_direction, _direction.Length, new Vector3D<float>(1));
+
+        _vecVis.Render(_velocity, 1000, new Vector3D<float>(1, 1, 0));
+
+        _vecVis.Render(
+            _accelerationVector,
+            _isAccelerating ? _accelerationRate : MathF.Abs(_decelerationRate),
+            _isAccelerating ? new Vector3D<float>(0, 1, 0) : new Vector3D<float>(1, 0, 0));
     }
 
     public void Update(double delta)
@@ -138,32 +152,37 @@ public class Player
             _exhaustEmitter.Transform.Position = Transform.Position;
             _exhaustEmitter.Transform.Rotation = Transform.Rotation;
             _exhaustEmitter.Velocity = _velocity;
-            _exhaustEmitter.Update(delta);
         }
+
+        _exhaustEmitter.Update(delta);
+
+        _vecVis.Transform.Position = Transform.Position;
+
+        //Console.WriteLine($"Player: {_velocity}");
     }
 
     private void Move(double delta)
     {
         var acceleration = 0f;
-        var accelerationVector = Vector3D<float>.Zero;
+        _accelerationVector = Vector3D<float>.Zero;
 
         if (_isAccelerating)
         {
-            acceleration = _accelerationRate * (float)delta;
-            accelerationVector = _direction * _accelerationRate;
+            acceleration = _accelerationRate;
+            _accelerationVector = _direction * _accelerationRate;
         }
         else if (_velocity.Length > 0)
         {
-            acceleration = _decelerationRate * (float)delta;
-            accelerationVector = (_velocity / _velocity.Length) * _decelerationRate;
+            acceleration = _decelerationRate;
+            _accelerationVector = (_velocity / _velocity.Length) * _decelerationRate;
         }
 
-        _velocity += accelerationVector;
+        _velocity += _accelerationVector * (float)delta;
 
         var speed = _velocity.Length;
 
         var velNorm = _velocity / speed;
-        var accNorm = accelerationVector / accelerationVector.Length;
+        var accNorm = _accelerationVector / _accelerationVector.Length;
 
         if (speed > _maxSpeed)
         {
@@ -177,7 +196,7 @@ public class Player
             _velocity = Vector3D<float>.Zero;
         }
 
-        Transform.Position += _velocity;
+        Transform.Position += _velocity * (float)delta;
     }
 
     private void Turn(double delta)
@@ -186,7 +205,7 @@ public class Player
         {
             Transform.Rotation += _rotationSpeed * (float)delta * (sbyte)_rotations.Last();
 
-            _direction = Vector3D.Normalize(new Vector3D<float>((float)-Math.Sin(Transform.Rotation), (float)Math.Cos(Transform.Rotation), 0));
+            _direction = Vector3D.Normalize(new Vector3D<float>((float)-MathF.Sin(Transform.Rotation), (float)MathF.Cos(Transform.Rotation), 0));
         }
     }
 
